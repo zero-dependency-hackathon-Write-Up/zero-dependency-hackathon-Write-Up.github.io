@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en" prefix="og: https://ogp.me/ns#">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <!-- Primary SEO Meta Tags -->
+  <title>Zero-Dependency Linux SysAdmin Tool in Pure Python | Hackathon Writeup</title>
+  <meta name="title" content="Zero-Dependency Linux SysAdmin Tool in Pure Python | Hackathon Writeup" />
+  <meta name="description" content="How I built an audit and security CLI in pure Python by replacing 12 third-party packages with Linux /proc parsing, native hashlib, and standard library modules." />
+  <meta name="keywords" content="linux sysadmin, python zero dependency, proc filesystem, privilege escalation audit, lpe scanner, linux security tool, stdlib python" />
+  <meta name="author" content="Bhavishya" />
+  <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+  <link rel="canonical" href="https://github.com/Bhavishyaa12/Linux_sys_admin_tool" />
+
+  <!-- Open Graph / Facebook / LinkedIn -->
+  <meta property="og:type" content="article" />
+  <meta property="og:url" content="https://github.com/Bhavishyaa12/Linux_sys_admin_tool" />
+  <meta property="og:title" content="Zero-Dependency Linux SysAdmin Tool in Pure Python | Hackathon Writeup" />
+  <meta property="og:description" content="Technical breakdown of replacing psutil, watchdog, and 10 other packages using native Linux /proc parsing and Python standard library." />
+  <meta property="og:site_name" content="Linux SysAdmin Tool Writeup" />
+
+  <!-- Twitter / X Cards -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:url" content="https://github.com/Bhavishyaa12/Linux_sys_admin_tool" />
+  <meta name="twitter:title" content="Zero-Dependency Linux SysAdmin Tool in Pure Python | Hackathon Writeup" />
+  <meta name="twitter:description" content="Replacing 12 third-party libraries with pure Python stdlib for real-time Linux security auditing and process inspection." />
+
+  <!-- Structured Data: JSON-LD -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "TechArticle",
+        "headline": "Replacing 12 Third-Party Packages with Pure Python Stdlib for Linux Security",
+        "description": "A technical breakdown of building a zero-dependency Linux security auditing and process inspection tool by parsing /proc, /sys, and standard library modules.",
+        "author": {
+          "@type": "Person",
+          "name": "Bhavishya",
+          "url": "https://github.com/Bhavishyaa12"
+        },
+        "datePublished": "2026-09-03",
+        "inLanguage": "en",
+        "keywords": ["Linux", "Python", "SysAdmin", "Security", "Zero-Dependency", "/proc", "Privilege Escalation"]
+      },
+      {
+        "@type": "SoftwareSourceCode",
+        "name": "Linux_sys_admin_tool",
+        "programmingLanguage": "Python",
+        "runtimePlatform": "Linux",
+        "codeRepository": "https://github.com/Bhavishyaa12/Linux_sys_admin_tool",
+        "author": {
+          "@type": "Person",
+          "name": "Bhavishya",
+          "url": "https://github.com/Bhavishyaa12"
+        }
+      }
+    ]
+  }
+  </script>
+
+  <script>
+    (function () {
+      const savedTheme = localStorage.getItem("theme") || "system";
+      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      const resolvedTheme = savedTheme === "system" ? (prefersDark ? "dark" : "light") : savedTheme;
+      document.documentElement.setAttribute("data-theme", resolvedTheme);
+    })();
+  </script>
+
+  <!-- Preconnect CDNs -->
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
+  <link rel="preconnect" href="https://unpkg.com" crossorigin />
+
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  
+  <!-- Lenis CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/lenis@1.1.9/dist/lenis.css" />
+
+  <!-- Local Stylesheet -->
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- Reading Progress Bar -->
+  <div id="progressBar"></div>
+
+  <!-- Header -->
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="#" class="site-title" aria-label="Home">Linux_sys_admin_tool</a>
+
+      <div class="header-actions">
+        <a href="https://github.com/Bhavishyaa12/Linux_sys_admin_tool" target="_blank" rel="noopener" class="header-repo" aria-label="GitHub Repository">
+          <i class="fa-brands fa-github"></i>
+          <span>GitHub</span>
+        </a>
+
+        <!-- MDN-Style Theme Menu -->
+        <div class="theme-menu-container">
+          <button id="themeMenuButton" class="theme-menu-btn" aria-haspopup="true" aria-expanded="false" aria-label="Theme menu">
+            <i id="themeCurrentIcon" class="fa-solid fa-circle-half-stroke"></i>
+            <span id="themeCurrentLabel">Theme</span>
+            <i class="fa-solid fa-chevron-down caret-icon"></i>
+          </button>
+
+          <ul id="themeDropdown" class="theme-dropdown" role="menu" hidden>
+            <li role="none">
+              <button class="theme-option" role="menuitem" data-theme-value="system">
+                <i class="fa-solid fa-desktop"></i>
+                <span>OS Default</span>
+                <i class="fa-solid fa-check checkmark"></i>
+              </button>
+            </li>
+            <li role="none">
+              <button class="theme-option" role="menuitem" data-theme-value="light">
+                <i class="fa-solid fa-sun"></i>
+                <span>Light</span>
+                <i class="fa-solid fa-check checkmark"></i>
+              </button>
+            </li>
+            <li role="none">
+              <button class="theme-option" role="menuitem" data-theme-value="dark">
+                <i class="fa-solid fa-moon"></i>
+                <span>Dark</span>
+                <i class="fa-solid fa-check checkmark"></i>
+              </button>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="wrapper">
+    <main>
+      <article>
+        <header class="article-meta">
+          <div class="meta">TRACK A // ZERO DEPENDENCY HACKATHON WRITE-UP</div>
+          <h1>Replaced 12 Third-Party Packages with Python Stdlib</h1>
+        </header>
+
+        <!-- Section 1 -->
+        <section class="writeup-section">
+          <h2>1. What I Built by Hand</h2>
+          <p>
+            I made a standalone Linux administration and security auditing tool called Linux_sys_admin.py. Attacks on Linux servers are so common nowadays and privilege escalation (LPE) is a constant headache. Admins usually end up running dozens of separate commands or writing messy bash scripts just to inspect the kernel state. My script brings security checking user audits current process inspection and file tracking into one place with zero external dependencies
+          </p>
+          <p>
+            The script requires root permissions so it can safely read system-level files and kernel vfs(/proc). It checks things like duplicate accounts with UID 0 world-writable files(perm:777) SUID and SGID binaries and listening sockets(TCP/UDP).
+          </p>
+
+          <div class="screenshot-container">
+            <img 
+              src="terminal.png" 
+              alt="Terminal execution showing make help command with Python standard library security options on Pop OS" 
+              class="terminal-screenshot"
+              loading="lazy"
+            />
+          </div>
+        </section>
+
+        <!-- Section 2 -->
+        <section class="writeup-section">
+          <h2>2. Zero-Dep Verification Proofs</h2>
+          <p>
+            I have also made a python file for checking third-party packages in a python script and spotting it out :
+          </p>
+          <p>
+            First is verify_stdlib.py. It uses Python's own AST engine to parse every single import statement in the source code and validates each module against sys.stdlib_module_names. If a third-party module secretly get's imported in the test shows an error.
+          </p>
+          <p>
+            Second is deps-proof.txt which records the clean environment footprint.
+          </p>
+        </section>
+
+        <!-- Section 3 -->
+        <section class="writeup-section">
+          <h2>3. What Packages I Would Normally Reach For</h2>
+          <p>
+            If this were an everyday project without zero-dependency constraints I would have immediately reached for:
+          </p>
+          <p class="inline-packages">
+            <code>psutil</code> &bull; <code>watchdog</code> &bull; <code>click</code> &bull; <code>rich</code> &bull; <code>colorama</code> &bull; <code>tabulate</code> &bull; <code>sdbus</code> &bull; <code>systemd-python</code> &bull; <code>pyyaml</code> &bull; <code>filelock</code> &bull; <code>xxhash</code> &bull; <code>argcomplete</code>
+          </p>
+        </section>
+
+        <!-- Section 4 -->
+        <section class="writeup-section">
+          <h2>4. What It Actually Took to Replace Them</h2>
+          <p>
+            Swapping out those packages meant writing the underlying logic by hand. Here is the full breakdown of decisions and tradeoffs:
+          </p>
+
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Package</th>
+                  <th>Standard Library Used</th>
+                  <th>Why and How</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>click</code></td>
+                  <td><code>argparse</code></td>
+                  <td>Flag parsing subcommand dispatch and auto-generated help screens are already built into argparse. So replacing it with click was not a big deal for me.</td>
+                </tr>
+                <tr>
+                  <td><code>psutil</code> (processes)</td>
+                  <td><code>os.listdir("/proc")</code></td>
+                  <td>The Linux kernel exposes live process information as virtual text files. Reading status and cmdline directly helps us to skip psutil library.</td>
+                </tr>
+                <tr>
+                  <td><code>psutil</code> (network)</td>
+                  <td>Manual parse of <code>/proc/net/*</code></td>
+                  <td>Listening ports and socket states are stored in /proc/net/tcp and udp. I wrote hex address conversion logic to extract them directly.</td>
+                </tr>
+                <tr>
+                  <td><code>rich</code> / <code>colorama</code></td>
+                  <td>Raw ANSI escape sequences</td>
+                  <td>Color codes like \033[91m are standard terminal escapes. I used them(writing the ANSI escape codes where a big headache for real).</td>
+                </tr>
+                <tr>
+                  <td><code>watchdog</code></td>
+                  <td><code>hashlib.sha256</code> + polling</td>
+                  <td>Finding a stdlib substitute for watchdog took hours. Watchdog watches files in real time through inotify so I switched to point-in-time checks hashing files whenever the user asks.</td>
+                </tr>
+                <tr>
+                  <td><code>xxhash</code></td>
+                  <td><code>hashlib.sha256</code></td>
+                  <td>xxhash is fast but non-cryptographic. For system security and file modification tracking a cryptographic hash matters much more.To be honest this was my first smart choice of stdlib instead of the third-part library</td>
+                </tr>
+                <tr>
+                  <td><code>sdbus</code> / <code>systemd-python</code></td>
+                  <td><code>subprocess.run(["systemctl", ...])</code></td>
+                  <td>Direct D-Bus bindings need C extensions. Calling the native systemctl binary already on the machine gives the same active service list.</td>
+                </tr>
+                <tr>
+                  <td><code>tabulate</code></td>
+                  <td>Manual f-string formatting</td>
+                  <td>Fixed-width output like f"{name:&lt;20}{uid:&lt;8}" handles clean terminal columns without an extra formatting package.</td>
+                </tr>
+                <tr>
+                  <td><code>pyyaml</code> / <code>toml</code></td>
+                  <td><code>json</code></td>
+                  <td>hashes.json stores the file metadata database.Toml was also a good choice though I would have used that instead.</td>
+                </tr>
+                <tr>
+                  <td><code>filelock</code></td>
+                  <td><code>os.replace()</code> atomic swap</td>
+                  <td>Instead of file locking I write data to a temporary file first and swap it into place with os.replace() which is an atomic operation on Linux.</td>
+                </tr>
+                <tr>
+                  <td><code>pwd</code> helpers</td>
+                  <td><code>pwd</code> &amp; <code>grp</code></td>
+                  <td>UID-to-username and GID-to-group lookups are native standard library modules on POSIX systems.</td>
+                </tr>
+                <tr>
+                  <td><code>argcomplete</code></td>
+                  <td><code>bash_tab_complete.bash</code></td>
+                  <td>Instead of a Python package I wrote a standalone bash completion function using the shell's builtin complete command.This script was completely optional though so I won't include that in my main stdlib replace count.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p><strong>Replacing Filelock and Watchdog in Code</strong></p>
+          <p>
+            Here is the chunk from my script showing chunk-based SHA-256 calculation and JSON writes:
+          </p>
+
+          <pre><code>import hashlib
+import json
+import os
+
+def calculate_hash(filepath):
+    """Calculates SHA-256 in 4096-byte binary chunks with pure hashlib"""
+    sha256 = hashlib.sha256()
+    try:
+        with open(filepath, "rb") as f:
+            while chunk := f.read(4096):
+                sha256.update(chunk)
+        return sha256.hexdigest()
+    except (PermissionError, FileNotFoundError):
+        return None
+
+def save_hashes_atomically(data, target="hashes.json"):
+    """Atomic write pattern replacing cross-process filelock dependencies"""
+    temp_file = f"{target}.tmp"
+    with open(temp_file, "w") as f:
+        json.dump(data, f, indent=2)
+    os.replace(temp_file, target)</code></pre>
+        </section>
+
+        <!-- Section 5 -->
+        <section class="writeup-section">
+          <h2>5. The 13 Security Commands Built In</h2>
+          <p>
+            Here is what each flag in the main script actually executes when run against a live system:
+          </p>
+          <ul class="clean-options-list">
+            <li><code>-f, --file_integrity</code>: Creates or updates hashes.json storing SHA-256 hashes file sizes UID GID and mtime for critical files like /etc/passwd and /etc/group.</li>
+            <li><code>--check</code>: Verifies current file hashes against the database and throws an exit code error if any file has been modified.</li>
+            <li><code>--list</code>: Prints all files currently tracked in the integrity database.</li>
+            <li><code>--remove</code>: Removes a specific file from tracking in hashes.json.</li>
+            <li><code>--users</code>: Searches for any non-root user that has UID 0 which is a major red flag for privilege escalation.</li>
+            <li><code>--permissions</code>: Scans for world-writable files with 777 permissions.</li>
+            <li><code>--suid</code>: Detects files with SUID and SGID bits active to prevent privilege abuse.</li>
+            <li><code>--processes</code>: Gathers running process info memory usage and CPU state directly by iterating /proc.</li>
+            <li><code>--network</code>: Reads /proc/net/tcp and udp to list currently listening network ports.</li>
+            <li><code>--services</code>: Lists active system services via systemctl through subprocess.</li>
+            <li><code>--logs</code>: Searches through authentication log paths to surface failed login attempts.</li>
+            <li><code>--system</code>: Displays load averages total and free memory disk space and CPU architecture.</li>
+            <li><code>--audit</code>: Runs every check in sequence and outputs a full security assessment report.</li>
+          </ul>
+        </section>
+
+        <!-- Section 6: Specific GitHub Projects -->
+        <section class="writeup-section">
+          <h2>6. Other Projects &amp; Work</h2>
+          <p>
+            Apart from this zero-dependency hackathon tool here are some of my other open-source projects built for Linux environments and Android security:
+          </p>
+          <ul class="clean-options-list">
+            <li>
+              <a href="https://github.com/Bhavishyaa12/Linux-Server-Perfomance-stats-script" target="_blank" rel="noopener" class="text-link"><code>Linux-Server-Perfomance-stats-script</code></a>: 
+              A lightweight Linux server monitoring script that captures crucial performances like CPU load averages memory usage swap usage and disk I/O stats without requiring heavy enterprise agents.
+            </li>
+            <li>
+              <a href="https://github.com/Bhavishyaa12/Ad-Nuke" target="_blank" rel="noopener" class="text-link"><code>Ad-Nuke</code></a>: 
+              An Android tool and utility script focused on aggressive ad-blocking privacy controls by changing the /etc/hosts file(same file in linux environments) and redirecting the ad-blocking domains to localhost.
+            </li>
+            <li>
+              <a href="https://github.com/Bhavishyaa12/Linux-file-integrity-checker" target="_blank" rel="noopener" class="text-link"><code>Linux-file-integrity-checker</code></a>: 
+              A dedicated Linux file integrity monitoring utility that tracks file modifications hashes and system changes to detect unauthorized tampering on servers.
+            </li>
+          </ul>
+          <p>
+            You can check out the rest of my repos directly on my GitHub: 
+            <a href="https://github.com/Bhavishyaa12" target="_blank" rel="noopener" class="text-link">github.com/Bhavishyaa12</a>
+          </p>
+        </section>
+      </article>
+
+      <!-- Feedback Section -->
+      <section class="writeup-form">
+        <h2>Feedback</h2>
+        <p class="form-desc">
+          You can leave a hire note for me :)
+        </p>
+
+        <!-- Replace YOUR_FORM_ID with your Formspree ID to receive feedback emails -->
+        <form action="https://formspree.io/f/YOUR_FORM_ID" method="POST" id="submissionForm">
+          <div class="form-group">
+            <label for="visitorHandle">Your Email</label>
+            <input type="text" id="visitorHandle" name="sender" placeholder="e.g. yourname@domain.com" required />
+          </div>
+          <div class="form-group">
+            <label for="feedbackNotes">Suggestions</label>
+            <textarea id="feedbackNotes" name="message" rows="4" placeholder="Feedback or hire note..." required></textarea>
+          </div>
+          <button type="submit" id="submitBtn">Send</button>
+        </form>
+        <div id="formStatus" class="form-status"></div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Footer formatted to match header -->
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <span class="site-title">&copy; 2026 Bhavishya</span>
+      <div class="footer-actions">
+        <a href="https://github.com/Bhavishyaa12" target="_blank" rel="noopener" class="footer-link">
+          <i class="fa-brands fa-github"></i>
+          <span>GitHub</span>
+        </a>
+        <a href="https://instagram.com/bhavishyaa_12" target="_blank" rel="noopener" class="footer-link">
+          <i class="fa-brands fa-instagram"></i>
+          <span>Instagram</span>
+        </a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Lenis Smooth Scroll -->
+  <script src="https://unpkg.com/lenis@1.1.9/dist/lenis.min.js"></script>
+  <!-- Local Script -->
+  <script src="script.js"></script>
+</body>
+</html>
