@@ -99,7 +99,6 @@
           <span>GitHub</span>
         </a>
 
-        <!-- MDN-Style Theme Menu -->
         <div class="theme-menu-container">
           <button id="themeMenuButton" class="theme-menu-btn" aria-haspopup="true" aria-expanded="false" aria-label="Theme menu">
             <i id="themeCurrentIcon" class="fa-solid fa-circle-half-stroke"></i>
@@ -139,15 +138,14 @@
     <main>
       <article>
         <header class="article-meta">
-          <div class="meta">TRACK A // ZERO DEPENDENCY HACKATHON WRITE-UP</div>
+          <div class="meta">TRACK A - ZERO DEPENDENCY HACKATHON WRITE-UP</div>
           <h1>Replaced 12 Third-Party Packages with Python Stdlib</h1>
         </header>
 
-        <!-- Section 1 -->
         <section class="writeup-section">
           <h2>1. What I Built by Hand</h2>
           <p>
-            I made a standalone Linux administration and security auditing tool called Linux_sys_admin.py. Attacks on Linux servers are so common nowadays and privilege escalation (LPE) is a constant headache. Admins usually end up running dozens of separate commands or writing messy bash scripts just to inspect the kernel state. My script brings security checking user audits current process inspection and file tracking into one place with zero external dependencies
+            I made a standalone Linux administration and security auditing tool called Linux_sys_admin.py. Attacks on Linux servers are so common nowadays and privilege escalation (LPE) is a constant headache. Admins usually end up running dozens of separate commands or writing messy bash scripts just to inspect the kernel state. My script brings security checking user audits current process inspection and file tracking into one place with zero third-party libraries
           </p>
           <p>
             The script requires root permissions so it can safely read system-level files and kernel vfs(/proc). It checks things like duplicate accounts with UID 0 world-writable files(perm:777) SUID and SGID binaries and listening sockets(TCP/UDP).
@@ -156,14 +154,13 @@
           <div class="screenshot-container">
             <img 
               src="terminal.png" 
-              alt="Terminal execution showing make help command with Python standard library security options on Pop OS" 
+              alt="Photo of terminal of the make command on Pop-os"
               class="terminal-screenshot"
               loading="lazy"
             />
           </div>
         </section>
 
-        <!-- Section 2 -->
         <section class="writeup-section">
           <h2>2. Zero-Dep Verification Proofs</h2>
           <p>
@@ -175,9 +172,38 @@
           <p>
             Second is deps-proof.txt which records the clean environment footprint.
           </p>
+          <p>
+            Here is the actual check from verify_stdlib.py that walks the AST and flags anything that is not in sys.stdlib_module_name :
+          </p>
+          <pre><code>import ast
+import sys
+
+def find_bad_imports(filepath):
+    """Walks the AST and flags any import that is not stdlib"""
+    with open(filepath, "r") as f:
+        tree = ast.parse(f.read(), filename=filepath)
+
+    stdlib = sys.stdlib_module_names
+    bad = []
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                root = alias.name.split(".")[0]
+                if root not in stdlib:
+                    bad.append(root)
+        elif isinstance(node, ast.ImportFrom):
+            if node.module:
+                root = node.module.split(".")[0]
+                if root not in stdlib:
+                    bad.append(root)
+
+    return bad</code></pre>
+          <p>
+            If this returns an empty list the script is clean.
+          </p>
         </section>
 
-        <!-- Section 3 -->
         <section class="writeup-section">
           <h2>3. What Packages I Would Normally Reach For</h2>
           <p>
@@ -188,11 +214,13 @@
           </p>
         </section>
 
-        <!-- Section 4 -->
         <section class="writeup-section">
           <h2>4. What It Actually Took to Replace Them</h2>
           <p>
             Swapping out those packages meant writing the underlying logic by hand. Here is the full breakdown of decisions and tradeoffs:
+          </p>
+          <p>
+            In total this ended up replacing 12 packages with a few hundred extra lines of stdlib code that I wrote by hand and when I checked pip list before and after there was nothing left to install at all so a fresh clone runs on any box with just python3 and no requirements.txt needed.
           </p>
 
           <div class="table-container">
@@ -228,12 +256,12 @@
                 <tr>
                   <td><code>watchdog</code></td>
                   <td><code>hashlib.sha256</code> + polling</td>
-                  <td>Finding a stdlib substitute for watchdog took hours. Watchdog watches files in real time through inotify so I switched to point-in-time checks hashing files whenever the user asks.</td>
+                  <td>Finding a stdlib substitute for watchdog took hours. Watchdog watches files in real time through inotify so I switched to point-in-time checks hashing files whenever the user asks. This was probably the biggest tradeoff in the whole project because inotify tells you in a split of a second a file changes and my version only knows if a file changed whenever --check(switch) gets run next which could be minutes or hours later depending on how often the admin runs it. For a security tool that is a real gap since an attacker could modify a file and revert it before the next check and it would never show up in the hashes.json diff. I decided this was an acceptable tradeoff for a zero dependency hackathon build because inotify support in pure python without watchdog basically means writing raw inotify syscalls which was a difficult job to do which was eventually a rabbit hole.I had and point in time hashing still catches the vast majority of real tampering scenarios.</td>
                 </tr>
                 <tr>
                   <td><code>xxhash</code></td>
                   <td><code>hashlib.sha256</code></td>
-                  <td>xxhash is fast but non-cryptographic. For system security and file modification tracking a cryptographic hash matters much more.To be honest this was my first smart choice of stdlib instead of the third-part library</td>
+                  <td>xxhash is fast but non-cryptographic. For system security and file modification tracking a cryptographic hash matters much more.To be honest this was my first smart choice of stdlib instead of the third-party library</td>
                 </tr>
                 <tr>
                   <td><code>sdbus</code> / <code>systemd-python</code></td>
@@ -269,6 +297,53 @@
             </table>
           </div>
 
+          <p><strong>Replacing psutil for Process Reading in Code</strong></p>
+          <p>
+            With psutil installed this would have been one line like psutil.process_iter() and it hands you back memory and CPU fields ready to use. Here is the actual chunk from my script reading /proc directly instead since that comparison is really the whole point of this writeup:
+          </p>
+
+          <pre><code>def read_proc_file(path):
+    try:
+        with open(path, "r") as f:
+            return f.read()
+    except (FileNotFoundError, PermissionError, OSError):
+        return None
+
+def audit_processes():
+    proc_path = "/proc"
+    processes = []
+
+    for entry in os.listdir(proc_path):
+        if not entry.isdigit():
+            continue
+
+        pid = entry
+        status = read_proc_file(os.path.join(proc_path, pid, "status"))
+        cmdline = read_proc_file(os.path.join(proc_path, pid, "cmdline"))
+
+        if status is None:
+            continue
+
+        name = pid
+        uid = "?"
+
+        for line in status.splitlines():
+            if line.startswith("Name:"):
+                name = line.split(":", 1)[1].strip()
+            elif line.startswith("Uid:"):
+                uid = line.split()[1]
+
+        if cmdline:
+            command = cmdline.replace("\x00", " ").strip()
+        else:
+            command = name
+
+        processes.append((int(pid), uid, name, command))</code></pre>
+
+          <p>
+            The psutil version is obviously shorter but it hides everything behind the library. Reading status and cmdline by hand meant I had to actually learn the format of those files instead of just trusting a wrapper. Right now my version only pulls PID UID name and command out of status and cmdline since that was enough for a security audit but memory and CPU fields live in the same status file so adding them later is just a few more lines in that same for loop and not a rewrite.
+          </p>
+
           <p><strong>Replacing Filelock and Watchdog in Code</strong></p>
           <p>
             Here is the chunk from my script showing chunk-based SHA-256 calculation and JSON writes:
@@ -290,14 +365,12 @@ def calculate_hash(filepath):
         return None
 
 def save_hashes_atomically(data, target="hashes.json"):
-    """Atomic write pattern replacing cross-process filelock dependencies"""
     temp_file = f"{target}.tmp"
     with open(temp_file, "w") as f:
         json.dump(data, f, indent=2)
     os.replace(temp_file, target)</code></pre>
         </section>
 
-        <!-- Section 5 -->
         <section class="writeup-section">
           <h2>5. The 13 Security Commands Built In</h2>
           <p>
@@ -311,7 +384,7 @@ def save_hashes_atomically(data, target="hashes.json"):
             <li><code>--users</code>: Searches for any non-root user that has UID 0 which is a major red flag for privilege escalation.</li>
             <li><code>--permissions</code>: Scans for world-writable files with 777 permissions.</li>
             <li><code>--suid</code>: Detects files with SUID and SGID bits active to prevent privilege abuse.</li>
-            <li><code>--processes</code>: Gathers running process info memory usage and CPU state directly by iterating /proc.</li>
+            <li><code>--processes</code>: Iterates /proc reading status and cmdline for every running process and prints PID UID name and command in a table.</li>
             <li><code>--network</code>: Reads /proc/net/tcp and udp to list currently listening network ports.</li>
             <li><code>--services</code>: Lists active system services via systemctl through subprocess.</li>
             <li><code>--logs</code>: Searches through authentication log paths to surface failed login attempts.</li>
@@ -320,7 +393,6 @@ def save_hashes_atomically(data, target="hashes.json"):
           </ul>
         </section>
 
-        <!-- Section 6: Specific GitHub Projects -->
         <section class="writeup-section">
           <h2>6. Other Projects &amp; Work</h2>
           <p>
@@ -347,7 +419,6 @@ def save_hashes_atomically(data, target="hashes.json"):
         </section>
       </article>
 
-      <!-- Feedback Section -->
       <section class="writeup-form">
         <h2>Feedback</h2>
         <p class="form-desc">
@@ -370,7 +441,7 @@ def save_hashes_atomically(data, target="hashes.json"):
     </main>
   </div>
 
-  <!-- Footer formatted to match header -->
+<!-- Footer formatted to match header -->
   <footer class="site-footer">
     <div class="footer-inner">
       <span class="site-title">&copy; 2026 Bhavishya</span>
@@ -379,17 +450,20 @@ def save_hashes_atomically(data, target="hashes.json"):
           <i class="fa-brands fa-github"></i>
           <span>GitHub</span>
         </a>
-        <a href="https://instagram.com/bhavishyaa_12" target="_blank" rel="noopener" class="footer-link">
+       <a href="https://linkedin.com/in/bhavishyaa12" target="_blank" rel="noopener" class="footer-link">
+          <i class="fa-brands fa-linkedin"></i>
+          <span>LinkedIn</span>
+        </a>
+       <a href="https://instagram.com" target="_blank" rel="noopener" class="footer-link">
           <i class="fa-brands fa-instagram"></i>
           <span>Instagram</span>
-        </a>
+       </a>
+      
       </div>
     </div>
   </footer>
 
-  <!-- Lenis Smooth Scroll -->
   <script src="https://unpkg.com/lenis@1.1.9/dist/lenis.min.js"></script>
-  <!-- Local Script -->
   <script src="script.js"></script>
 </body>
 </html>

@@ -503,6 +503,13 @@ button[type="submit"]:hover {
   transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
+/* Keep the footer copyright visually lighter than the navbar title */
+.site-footer .site-title {
+  font-weight: 400;
+  font-size: 0.85rem;
+  letter-spacing: 0;
+}
+
 .footer-inner {
   max-width: 960px;
   margin: 0 auto;
@@ -548,22 +555,33 @@ button[type="submit"]:hover {
   .header-inner,
   .footer-inner {
     padding: 12px 16px;
-    gap: 12px;
+    gap: 10px;
   }
 
   .site-title {
     font-size: 1rem;
   }
 
+  .site-footer .site-title {
+    font-size: 0.78rem;
+    font-weight: 400;
+  }
+
   .header-actions,
   .footer-actions {
-    gap: 14px;
+    gap: 10px;
+    flex-wrap: wrap;
   }
 
   .header-repo,
   .footer-link {
-    font-size: 0.8rem;
-    gap: 6px;
+    font-size: 0.75rem;
+    gap: 5px;
+  }
+
+  .footer-inner {
+    padding-top: 12px;
+    padding-bottom: 12px;
   }
 
   .theme-menu-btn {
